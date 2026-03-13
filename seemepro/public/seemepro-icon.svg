@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#111111"/>
+      <stop offset="100%" stop-color="#050505"/>
+    </radialGradient>
+    <filter id="soft" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="1.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" fill="url(#bg)" rx="90"/>
+
+  <!-- Inner border frame -->
+  <rect x="28" y="28" width="456" height="456" rx="72"
+    fill="none" stroke="white" stroke-width="2" opacity="0.9"/>
+
+  <!-- ── Crosshair lines ── -->
+  <!-- Vertical line top -->
+  <line x1="256" y1="50" x2="256" y2="150" stroke="#666" stroke-width="1" opacity="0.7"/>
+  <!-- Vertical line bottom -->
+  <line x1="256" y1="362" x2="256" y2="462" stroke="#666" stroke-width="1" opacity="0.7"/>
+  <!-- Horizontal line left -->
+  <line x1="50"  y1="256" x2="150" y2="256" stroke="#666" stroke-width="1" opacity="0.7"/>
+  <!-- Horizontal line right -->
+  <line x1="362" y1="256" x2="462" y2="256" stroke="#666" stroke-width="1" opacity="0.7"/>
+
+  <!-- ── Corner WiFi arcs (top-left) ── -->
+  <path d="M 108 108 A 30 30 0 0 1 138 108" fill="none" stroke="#555" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 95  95  A 50 50 0 0 1 145 95"  fill="none" stroke="#444" stroke-width="4" stroke-linecap="round"/>
+  <!-- Corner WiFi arcs (top-right) -->
+  <path d="M 404 108 A 30 30 0 0 0 374 108" fill="none" stroke="#555" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 417  95  A 50 50 0 0 0 367 95"  fill="none" stroke="#444" stroke-width="4" stroke-linecap="round"/>
+  <!-- Corner WiFi arcs (bottom-left) -->
+  <path d="M 108 404 A 30 30 0 0 0 138 404" fill="none" stroke="#555" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 95  417  A 50 50 0 0 0 145 417"  fill="none" stroke="#444" stroke-width="4" stroke-linecap="round"/>
+  <!-- Corner WiFi arcs (bottom-right) -->
+  <path d="M 404 404 A 30 30 0 0 1 374 404" fill="none" stroke="#555" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 417 417  A 50 50 0 0 1 367 417"  fill="none" stroke="#444" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- ── Compass dots ── -->
+  <!-- Top -->
+  <circle cx="256" cy="78"  r="10" fill="#888"/>
+  <circle cx="256" cy="110" r="14" fill="#666"/>
+  <!-- Bottom -->
+  <circle cx="256" cy="434" r="10" fill="#888"/>
+  <!-- Left -->
+  <circle cx="78"  cy="256" r="10" fill="#888"/>
+  <circle cx="60"  cy="256" r="6"  fill="#777"/>
+  <!-- Right -->
+  <circle cx="434" cy="256" r="10" fill="#888"/>
+  <circle cx="452" cy="256" r="6"  fill="#777"/>
+  <!-- Mid-diagonal dots -->
+  <circle cx="148" cy="158" r="12" fill="#666"/>
+  <circle cx="364" cy="158" r="12" fill="#666"/>
+  <circle cx="148" cy="354" r="12" fill="#666"/>
+  <circle cx="364" cy="354" r="12" fill="#666"/>
+
+  <!-- ── Concentric scan rings ── -->
+  <circle cx="256" cy="256" r="130" fill="none" stroke="#333" stroke-width="1.2" opacity="0.8"/>
+  <circle cx="256" cy="256" r="100" fill="none" stroke="#3a3a3a" stroke-width="1"   opacity="0.8"/>
+  <circle cx="256" cy="256" r="74"  fill="none" stroke="#404040" stroke-width="1"   opacity="0.8"/>
+
+  <!-- ── Main eye oval (white, bright) ── -->
+  <ellipse cx="256" cy="256" rx="162" ry="96"
+    fill="none" stroke="white" stroke-width="3" filter="url(#soft)"/>
+
+  <!-- ── Pupil / iris ── -->
+  <circle cx="256" cy="256" r="44" fill="#0a0a0a" stroke="#ccc" stroke-width="2"/>
+  <!-- Inner pupil dark -->
+  <circle cx="256" cy="256" r="26" fill="#050505"/>
+  <!-- Specular highlight -->
+  <ellipse cx="246" cy="248" rx="8" ry="5" fill="white" opacity="0.95" transform="rotate(-20 246 248)"/>
+  <circle  cx="262" cy="262" r="3" fill="white" opacity="0.4"/>
+
+  <!-- ── Equalizer bars at bottom ── -->
+  <rect x="210" y="365" width="12" height="22" rx="3" fill="#666"/>
+  <rect x="228" y="358" width="12" height="29" rx="3" fill="#777"/>
+  <rect x="246" y="352" width="12" height="35" rx="3" fill="#888"/>
+  <rect x="264" y="356" width="12" height="31" rx="3" fill="#777"/>
+  <rect x="282" y="362" width="12" height="25" rx="3" fill="#666"/>
+  <rect x="300" y="367" width="12" height="20" rx="3" fill="#555"/>
+
+  <!-- ── AI ANALYZER badge ── -->
+  <rect x="188" y="436" width="136" height="22" rx="4"
+    fill="none" stroke="#666" stroke-width="1"/>
+  <text x="256" y="452"
+    font-family="'Courier New', monospace"
+    font-size="11"
+    font-weight="700"
+    letter-spacing="2"
+    text-anchor="middle"
+    fill="#999">AI ANALYZER</text>
+</svg>
