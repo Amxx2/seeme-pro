@@ -369,6 +369,10 @@ const VideoAnalysis = () => {
     const [videoSrc, setVideoSrc] = useState<string | null>(null);
     const [showVideoAdModal, setShowVideoAdModal] = useState(false);
     const [showReportModal, setShowReportModal] = useState(false);
+    // ── Celebrity Decoder State ────────────────────────────────────────────
+    const [celebMode, setCelebMode] = useState(false);
+    const [showCelebPicker, setShowCelebPicker] = useState(false);
+    const [selectedCeleb, setSelectedCeleb] = useState<string | null>(null);
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const liveVideoRef = useRef<HTMLVideoElement>(null);
@@ -584,6 +588,15 @@ const VideoAnalysis = () => {
         if (overlayRef.current) overlayRef.current.getContext('2d')?.clearRect(0, 0, overlayRef.current.width, overlayRef.current.height);
     };
 
+    // ── Share Celebrity Result ─────────────────────────────────────────────
+    const shareCelebResult = (platform: 'whatsapp' | 'instagram') => {
+        if (!result) return;
+        const celebName = selectedCeleb || 'المشهور';
+        const text = `🎭 SeeMePro Celebrity Decoder\n\nحللت ${celebName}:\n✅ الثقة: ${result.scores?.confidence || 0}%\n🔍 الصدق: ${result.scores?.authenticity || 0}%\n⚠️ التوتر: ${Math.max(0, 100 - (result.scores?.authenticity || 50))}%\n\n${result.analysis?.summary || ''}\n\nحلّل أي مشهور على SeeMePro 👁️`;
+        if (platform === 'whatsapp') window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        else window.open(`https://www.instagram.com/`, '_blank');
+    };
+
     return (
         <div className="flex flex-col h-full max-w-7xl mx-auto gap-8 pb-20 overflow-x-hidden" dir={isRtl ? 'rtl' : 'ltr'}>
             <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
@@ -600,7 +613,14 @@ const VideoAnalysis = () => {
                     </div>
                 </div>
                 {!isVideoLoaded && (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
+                        {/* 🎭 Celebrity Decoder Button */}
+                        <button
+                            onClick={() => { setShowCelebPicker(p => !p); setCelebMode(true); }}
+                            className="flex items-center gap-2 px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider transition-all hover:scale-105 active:scale-95 shadow-[0_0_24px_rgba(234,179,8,0.4)] bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-600 text-black"
+                        >
+                            🎭 حلّل مشهوراً
+                        </button>
                         <button onClick={handleCameraClick} className="flex items-center gap-2 px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold transition-colors shadow-lg shadow-teal-900/50">
                             <Camera className="w-5 h-5" /> Live Capture
                         </button>
@@ -625,6 +645,56 @@ const VideoAnalysis = () => {
 
             {uploadError && (
                 <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl text-center z-10">{uploadError}</div>
+            )}
+
+            {/* 🎭 Celebrity Picker Panel */}
+            {showCelebPicker && !isVideoLoaded && (
+                <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="relative z-10 bg-gradient-to-br from-yellow-500/10 to-amber-500/5 border border-yellow-500/30 rounded-3xl p-6"
+                >
+                    <div className="flex items-center justify-between mb-5">
+                        <div>
+                            <h3 className="text-xl font-black text-yellow-400 flex items-center gap-2">🎭 Celebrity Decoder</h3>
+                            <p className="text-gray-400 text-sm mt-1">ارفع فيديو لأي مشهور وسيقوم الذكاء الاصطناعي بتحليل سلوكه الكامل</p>
+                        </div>
+                        <button onClick={() => setShowCelebPicker(false)} className="text-gray-500 hover:text-white transition-colors">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                    {/* Celebrity Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-5">
+                        {[
+                            { name: 'إيلون ماسك', emoji: '🚀', desc: 'CEO Tesla & SpaceX', color: 'from-blue-600/30 to-blue-800/30', border: 'border-blue-500/40' },
+                            { name: 'ستيف جوبز', emoji: '🍎', desc: 'مؤسس Apple', color: 'from-gray-600/30 to-gray-800/30', border: 'border-gray-500/40' },
+                            { name: 'أوباما', emoji: '🇺🇸', desc: 'رئيس أمريكا سابق', color: 'from-indigo-600/30 to-indigo-800/30', border: 'border-indigo-500/40' },
+                            { name: 'كريستيانو رونالدو', emoji: '⚽', desc: 'نجم كرة القدم', color: 'from-green-600/30 to-green-800/30', border: 'border-green-500/40' },
+                            { name: 'محمد صلاح', emoji: '🦅', desc: 'النسر المصري', color: 'from-red-600/30 to-red-800/30', border: 'border-red-500/40' },
+                            { name: 'جيف بيزوس', emoji: '📦', desc: 'مؤسس Amazon', color: 'from-orange-600/30 to-orange-800/30', border: 'border-orange-500/40' },
+                            { name: 'مارك زوكربيرج', emoji: '🐦', desc: 'CEO Meta', color: 'from-blue-500/30 to-indigo-600/30', border: 'border-blue-400/40' },
+                            { name: 'ترامب', emoji: '🇺🇸', desc: 'رئيس أمريكا', color: 'from-red-700/30 to-red-900/30', border: 'border-red-600/40' },
+                            { name: 'بيل غيتس', emoji: '💻', desc: 'مؤسس Microsoft', color: 'from-cyan-600/30 to-cyan-800/30', border: 'border-cyan-500/40' },
+                            { name: 'مشهور آخر', emoji: '🎭', desc: 'ارفع فيديوه', color: 'from-yellow-500/30 to-amber-600/30', border: 'border-yellow-400/40' },
+                        ].map((celeb) => (
+                            <button
+                                key={celeb.name}
+                                onClick={() => {
+                                    setSelectedCeleb(celeb.name);
+                                    setCelebMode(true);
+                                    setShowCelebPicker(false);
+                                    fileInputRef.current?.click();
+                                }}
+                                className={`flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br ${celeb.color} border ${celeb.border} hover:scale-105 active:scale-95 transition-all cursor-pointer text-center`}
+                            >
+                                <span className="text-3xl">{celeb.emoji}</span>
+                                <span className="text-white text-xs font-black leading-tight">{celeb.name}</span>
+                                <span className="text-gray-400 text-[10px]">{celeb.desc}</span>
+                            </button>
+                        ))}
+                    </div>
+                    <p className="text-center text-xs text-gray-500">⚠️ للاستخدام التعليمي فقط • نتائج استرشادية من الذكاء الاصطناعي</p>
+                </motion.div>
             )}
 
             <div className="flex flex-col lg:flex-row gap-6 items-start relative z-10">
@@ -833,6 +903,128 @@ const VideoAnalysis = () => {
                                                 ))}
                                             </div>
                                         </div>
+                                    )}
+
+                                    {/* 🎭 Celebrity Behavioral Profile (Special Report) */}
+                                    {celebMode && result && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.5 }}
+                                            className="rounded-3xl overflow-hidden border border-yellow-500/40 bg-gradient-to-br from-yellow-500/10 to-amber-600/5"
+                                        >
+                                            {/* Header */}
+                                            <div className="bg-gradient-to-r from-yellow-600 to-amber-500 p-5 flex items-center justify-between">
+                                                <div>
+                                                    <h3 className="text-black font-black text-xl flex items-center gap-2">🎭 Celebrity Behavioral Profile</h3>
+                                                    <p className="text-black/70 text-sm font-bold mt-0.5">تحليل ثلاثي سلوكي متصصص</p>
+                                                </div>
+                                                <span className="text-5xl">🔍</span>
+                                            </div>
+
+                                            <div className="p-6 flex flex-col gap-5" dir="rtl">
+                                                {/* Celeb Name Detected */}
+                                                <div className="flex items-center gap-4 bg-black/30 rounded-2xl p-4 border border-yellow-500/20">
+                                                    <span className="text-4xl">🎭</span>
+                                                    <div>
+                                                        <p className="text-yellow-400 font-black text-lg">{selectedCeleb || 'الشخصية المحللة'}</p>
+                                                        <p className="text-gray-400 text-sm">حلل الذكاء الاصطناعي سلوكه بدقة عالية</p>
+                                                    </div>
+                                                    <div className="mr-auto flex gap-4">
+                                                        <div className="text-center">
+                                                            <div className="text-2xl font-black text-green-400">{result.scores?.confidence || 0}%</div>
+                                                            <div className="text-xs text-gray-500">الثقة</div>
+                                                        </div>
+                                                        <div className="text-center">
+                                                            <div className="text-2xl font-black text-blue-400">{result.scores?.authenticity || 0}%</div>
+                                                            <div className="text-xs text-gray-500">الصدق</div>
+                                                        </div>
+                                                        <div className="text-center">
+                                                            <div className="text-2xl font-black text-red-400">{Math.max(0, 100 - (result.scores?.authenticity || 50))}%</div>
+                                                            <div className="text-xs text-gray-500">التوتر</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Strengths in Interviews */}
+                                                {result.analysis?.strengths?.length > 0 && (
+                                                    <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-4">
+                                                        <h4 className="text-green-400 font-black text-sm mb-3 flex items-center gap-2">💪 نقاط قوته في المقابلات</h4>
+                                                        <ul className="flex flex-col gap-2">
+                                                            {result.analysis.strengths.slice(0, 3).map((s, i) => (
+                                                                <li key={i} className="text-gray-200 text-sm flex items-center gap-2">
+                                                                    <span className="text-yellow-400">★</span>{s}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+
+                                                {/* Body Language Secrets */}
+                                                {result.body_language?.length > 0 && (
+                                                    <div className="bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4">
+                                                        <h4 className="text-purple-400 font-black text-sm mb-3 flex items-center gap-2">🤎 أسرار لغة جسده</h4>
+                                                        <div className="flex flex-col gap-2">
+                                                            {result.body_language.slice(0, 3).map((b, i) => (
+                                                                <div key={i} className="flex items-start gap-2">
+                                                                    <span className="text-purple-400 text-lg">◆</span>
+                                                                    <div>
+                                                                        <span className="text-white text-sm font-bold">{b.zone}: </span>
+                                                                        <span className="text-gray-300 text-sm">{b.observation}</span>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Deception / Tension Moments */}
+                                                {result.red_flags?.length > 0 && (
+                                                    <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4">
+                                                        <h4 className="text-red-400 font-black text-sm mb-3 flex items-center gap-2">⚠️ لحظات التوتر والكذب المحتمل</h4>
+                                                        <ul className="flex flex-col gap-2">
+                                                            {result.red_flags.slice(0, 3).map((f, i) => (
+                                                                <li key={i} className="text-red-200 text-sm flex items-start gap-2">
+                                                                    <span className="text-red-400">⚠</span>{f}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+
+                                                {/* Learn From Celeb */}
+                                                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4">
+                                                    <h4 className="text-yellow-400 font-black text-sm mb-3 flex items-center gap-2">🌟 تعلم من {selectedCeleb || 'هذا المشهور'}</h4>
+                                                    <p className="text-gray-200 text-sm leading-relaxed">
+                                                        {result.analysis?.summary
+                                                            ? `استنتجنا من تحليل ${selectedCeleb || 'هذه الشخصية'}: ${result.analysis.summary}`
+                                                            : `التحليل يكشف أنماط سلوكية فريدة لدى هذه الشخصية يمكنك تطويرها.`}
+                                                    </p>
+                                                </div>
+
+                                                {/* Compare with me + Share buttons */}
+                                                <div className="flex flex-col sm:flex-row gap-3">
+                                                    <button
+                                                        onClick={() => shareCelebResult('whatsapp')}
+                                                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-green-600/20 border border-green-600/30 text-green-400 hover:bg-green-600/30 transition-colors font-bold text-sm"
+                                                    >
+                                                        💬 شارك على واتسآب
+                                                    </button>
+                                                    <button
+                                                        onClick={() => shareCelebResult('instagram')}
+                                                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-pink-600/20 border border-pink-600/30 text-pink-400 hover:bg-pink-600/30 transition-colors font-bold text-sm"
+                                                    >
+                                                        📸 شارك على إنستغرام
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { setCelebMode(false); setSelectedCeleb(null); resetAnalysis(); }}
+                                                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/30 transition-colors font-bold text-sm"
+                                                    >
+                                                        🤷 قارن نفسك بـ {selectedCeleb || 'المشهور'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </motion.div>
                                     )}
 
                                     <p className="text-gray-600 text-xs text-center" dir={isRtl ? 'rtl' : 'ltr'}>{result.disclaimer}</p>
