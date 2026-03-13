@@ -7,6 +7,7 @@ import { analyzeVideoFrameWithOpenAI, analyzeVideoWithOpenAI } from '../utils/vi
 import type { DetailedVideoAnalysis } from '../utils/videoAnalysisService';
 import { RewardedAdModal } from '../components/RewardedAdModal';
 import { supabase } from '../config/supabase';
+import { useFaceMeshOverlay } from '../hooks/useFaceMeshOverlay';
 
 // ── TV-Style Cinematic Forensic Canvas Overlay Painter ──────────────────────────
 function paintVideoOverlays(canvas: HTMLCanvasElement, result: DetailedVideoAnalysis) {
@@ -374,8 +375,22 @@ const VideoAnalysis = () => {
     const overlayRef = useRef<HTMLCanvasElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const animFrameRef = useRef<number | null>(null);
+    const liveFaceMeshCanvasRef = useRef<HTMLCanvasElement>(null);
 
     const { user, consumeCredit, addCreditFromAd } = useAppStore();
+
+    // Real-time MediaPipe FaceMesh on live camera capture (forensic mode)
+    const videoSessionId = `vid_${Date.now().toString(36)}`;
+    useFaceMeshOverlay({
+        videoRef: liveVideoRef,
+        canvasRef: liveFaceMeshCanvasRef,
+        isActive: isCameraActive,
+        stressLevel: result ? Math.max(0, 100 - (result.scores?.authenticity ?? 60)) : 30,
+        authenticity: result?.scores?.authenticity ?? 0,
+        confidence: result?.scores?.confidence ?? 0,
+        mode: 'forensic',
+        sessionId: videoSessionId,
+    });
 
     // Scanline Animation Loop effect when result exists!
     useEffect(() => {
@@ -627,7 +642,9 @@ const VideoAnalysis = () => {
                                 {isCameraActive ? (
                                     <>
                                         <video ref={liveVideoRef} className="w-full h-full object-cover transform -scale-x-100" playsInline muted autoPlay />
-                                        <button onClick={captureAndAnalyze} className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white text-black font-bold px-6 py-2 rounded-full shadow-2xl hover:bg-gray-200 flex items-center gap-2">
+                                        {/* Real-time FaceMesh overlay for live camera */}
+                                        <canvas ref={liveFaceMeshCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-10" />
+                                        <button onClick={captureAndAnalyze} className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white text-black font-bold px-6 py-2 rounded-full shadow-2xl hover:bg-gray-200 flex items-center gap-2 z-20">
                                             <Camera className="w-4 h-4 text-red-500" /> تحليل اللقطة
                                         </button>
                                     </>

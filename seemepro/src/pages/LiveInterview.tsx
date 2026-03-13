@@ -8,6 +8,7 @@ import { analyzeLiveFrameWithOpenAI } from '../utils/liveAnalysisService';
 import type { DetailedLiveAnalysis, LiveAnalysisContext } from '../utils/liveAnalysisService';
 import { useAppStore } from '../store/useAppStore';
 import { RewardedAdModal } from '../components/RewardedAdModal';
+import { useFaceMeshOverlay } from '../hooks/useFaceMeshOverlay';
 
 const ANALYSIS_INTERVAL_MS = 3500;
 
@@ -109,6 +110,8 @@ const LiveInterview = () => {
     const [recentAnalysis, setRecentAnalysis] = useState<DetailedLiveAnalysis | null>(null);
     const [isAnalyzingFrame, setIsAnalyzingFrame] = useState(false);
     const [antiCheatAlerts, setAntiCheatAlerts] = useState<{ id: string, msg: string, time: string }[]>([]);
+    const [elapsedSecs, setElapsedSecs] = useState(0);
+    const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
     // Aggregated Results for Report
     const [avgScores, setAvgScores] = useState({ confidence: 0, authenticity: 0, engagement: 0, calmness: 0, integrity: 100 });
@@ -118,8 +121,39 @@ const LiveInterview = () => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    const faceMeshCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const contextRef = useRef<LiveAnalysisContext | null>(null);
     const frameIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // Derived stress from recentAnalysis for FaceMesh color coding
+    const liveStress = recentAnalysis?.emotion_bar?.find(e => e.emotion === 'stress')?.intensity
+        ?? recentAnalysis?.scores ? Math.max(0, 100 - (recentAnalysis?.scores?.calmness ?? 100)) : 0;
+    const liveLabel = recentAnalysis?.emotion_bar?.[0]?.label ?? '';
+    const liveConf = recentAnalysis?.scores?.confidence ?? 0;
+    const liveAuth = recentAnalysis?.scores?.authenticity ?? 0;
+
+    // Elapsed session timer
+    useEffect(() => {
+        if (setupStep !== 'live') return;
+        const t = setInterval(() => setElapsedSecs(s => s + 1), 1000);
+        return () => clearInterval(t);
+    }, [setupStep]);
+
+    // Real-time MediaPipe FaceMesh overlay on live camera
+    useFaceMeshOverlay({
+        videoRef,
+        canvasRef: faceMeshCanvasRef,
+        isActive: setupStep === 'live',
+        candidateName: config.candidateName,
+        role: config.role,
+        elapsedSecs,
+        analysisLabel: liveLabel,
+        stressLevel: liveStress,
+        confidence: liveConf,
+        authenticity: liveAuth,
+        mode: 'live',
+        sessionId,
+    });
 
     // Prevent scrolling when in wizard/report modal
     useEffect(() => {
@@ -216,10 +250,10 @@ const LiveInterview = () => {
 
     }, [config.examMode, totalViolations]);
 
-    const startCamera = useCallback(async () => {
+    const startCamera = useCallback(async (facing: 'user' | 'environment' = facingMode) => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 1280, height: 720, frameRate: 30, facingMode: 'user' },
+                video: { width: 1280, height: 720, frameRate: 30, facingMode: facing },
                 audio: true,
             });
             videoStreamRef.current = stream;
@@ -253,16 +287,23 @@ const LiveInterview = () => {
         } catch (err) {
             console.warn('Camera access denied:', err);
         }
-    }, [sessionId, isAnalyzingFrame, processAnalysisResult, config.examMode]);
+    }, [sessionId, isAnalyzingFrame, processAnalysisResult, config.examMode, facingMode]);
 
     const handleStartLive = async () => {
         const hasCredit = consumeCredit('live');
-        if (!hasCredit) {
-            setShowAdModal(true);
-            return;
-        }
+        if (!hasCredit) { setShowAdModal(true); return; }
         setSetupStep('live');
-        await startCamera();
+        setElapsedSecs(0);
+        await startCamera(facingMode);
+    };
+
+    const handleCameraToggle = async () => {
+        const newFacing = facingMode === 'user' ? 'environment' : 'user';
+        setFacingMode(newFacing);
+        if (frameIntervalRef.current) { clearInterval(frameIntervalRef.current); frameIntervalRef.current = null; }
+        videoStreamRef.current?.getTracks().forEach(t => t.stop());
+        videoStreamRef.current = null;
+        await startCamera(newFacing);
     };
 
     const handleSaveToHR = () => {
@@ -460,7 +501,10 @@ const LiveInterview = () => {
                     <div className="flex-1 relative bg-black flex flex-col items-center justify-center p-4">
                         <div className={`relative w-full max-h-full aspect-video bg-[#0a0a0c] border rounded-lg overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.8)] transition-all duration-700 ${riskLevel === 'alert' ? 'border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.5)]' : 'border-white/10'}`}>
                             <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" autoPlay playsInline muted />
+                            {/* AI analysis overlay (painted per AI result) */}
                             <canvas ref={overlayCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-20" />
+                            {/* Real-time MediaPipe FaceMesh cinematic overlay */}
+                            <canvas ref={faceMeshCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-25" />
                             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,210,255,0.02)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none mix-blend-screen z-10" />
 
                             {/* Alert Flash */}
@@ -496,6 +540,14 @@ const LiveInterview = () => {
 
                             {/* Loading reticle */}
                             {isAnalyzingFrame && <div className="absolute top-4 right-4 z-40"><Crosshair className="w-5 h-5 text-cyan-400 animate-[spin_2s_linear_infinite] opacity-60" /></div>}
+                            {/* Camera flip button (mobile) */}
+                            <button
+                                onClick={handleCameraToggle}
+                                className="absolute top-3 left-1/2 -translate-x-1/2 z-40 bg-black/50 border border-white/20 text-white px-3 py-1 rounded-full text-xs font-bold hover:bg-white/20 transition flex items-center gap-1"
+                                title="تبديل الكاميرا"
+                            >
+                                <Camera className="w-3 h-3" /> {facingMode === 'user' ? '🤳 أمامية' : '📷 خلفية'}
+                            </button>
                         </div>
 
                         {/* Chart below video */}
