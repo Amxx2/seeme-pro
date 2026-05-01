@@ -1,4 +1,4 @@
-import { askGeminiWithImage } from './gemini';
+import { generateGeminiWithImage } from '../services/geminiService';
 
 export interface DetailedVideoAnalysis {
   session_id: string;
@@ -113,9 +113,10 @@ export async function extractFrameFromVideo(videoBlob: Blob): Promise<string> {
 // ─── MAIN EXPORTS ─────────────────────────────────────────────────────────────
 export async function analyzeVideoFrameWithOpenAI(base64: string, language: string = 'ar'): Promise<DetailedVideoAnalysis> {
   try {
-    const textContent = await askGeminiWithImage(
+    const textContent = await generateGeminiWithImage(
       getPrompt(language),
-      base64
+      base64,
+      'image/jpeg'
     );
 
     let jsonStr = textContent.trim();

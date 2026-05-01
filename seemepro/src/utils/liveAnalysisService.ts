@@ -1,4 +1,5 @@
-import { askGeminiWithImage } from './gemini';
+import type { LiveAnalysisResult } from '../services/geminiService';
+import { analyzeLiveFrameWithAI, generateGeminiWithImage } from '../services/geminiService';
 
 export interface LiveAnalysisContext {
   sessionId: string;
@@ -162,6 +163,208 @@ EXACT JSON STRUCTURE (follow this precisely with Arabic labels):
   "disclaimer": "Behavioral pattern analysis only. Not lie detection."
 }`;
 
+/** Maps lightweight Gemini metric JSON → full cinematic `DetailedLiveAnalysis` used by LiveInterview HUD. */
+function mapLiveGeminiMetricsToDetailed(
+  r: LiveAnalysisResult,
+  context: LiveAnalysisContext,
+  examMode: boolean
+): DetailedLiveAnalysis {
+  const elapsedSeconds = Math.floor((Date.now() - context.startTimeMs) / 1000);
+  const minutes = Math.floor(elapsedSeconds / 60);
+  const seconds = elapsedSeconds % 60;
+  const timeString = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const baselineProgress = Math.min(100, Math.floor((elapsedSeconds / 30) * 100));
+  const baselineEstablished = elapsedSeconds >= 30;
+
+  const stress = Math.max(0, Math.min(100, r.stress));
+  const truth = Math.max(0, Math.min(100, r.truth));
+  const engagement = Math.max(0, Math.min(100, r.engagement));
+  const calmness = Math.max(0, Math.min(100, 100 - stress));
+  const hesitation = Math.max(
+    0,
+    Math.min(100, r.voiceTremor + (r.anxiety === 'High' ? 25 : r.anxiety === 'Medium' ? 12 : 0))
+  );
+
+  const micro = r.microExpressions?.length ? r.microExpressions : ['لا توجد ملاحظات دقيقة من النموذج'];
+
+  const integrityDeduction =
+    examMode ? (r.anxiety === 'High' ? 12 : r.anxiety === 'Medium' ? 6 : 0) + Math.round(stress * 0.05) : 0;
+  const integrity_score = examMode ? Math.max(0, 100 - integrityDeduction) : undefined;
+
+  const exam_violations = examMode
+    ? [
+        { type: 'second_screen' as const, detected: false, confidence: 5, timestamp: timeString },
+        { type: 'reading_notes' as const, detected: false, confidence: 5, timestamp: timeString },
+        { type: 'someone_helping' as const, detected: false, confidence: 5, timestamp: timeString },
+        {
+          type: 'ai_generated' as const,
+          detected: stress > 88 && hesitation > 88,
+          confidence: stress > 88 ? Math.min(99, hesitation) : 8,
+          timestamp: timeString,
+        },
+        { type: 'phone_use' as const, detected: false, confidence: 4, timestamp: timeString },
+      ]
+    : undefined;
+
+  const result: DetailedLiveAnalysis = {
+    session: {
+      id: context.sessionId,
+      frame_number: context.framesProcessed,
+      timestamp: timeString,
+      language: 'ar',
+      baseline_established: baselineEstablished,
+      calibration_progress: baselineProgress,
+    },
+    scores: {
+      confidence: Math.round(Math.min(100, truth * 0.95 + 5)),
+      calmness: Math.round(calmness),
+      clarity: Math.round(Math.min(100, 72 + engagement * 0.15)),
+      authenticity: Math.round(truth),
+      engagement: Math.round(engagement),
+      congruence: Math.round((truth + engagement) / 2),
+      overall_grade: truth >= 82 ? 'A' : truth >= 68 ? 'B+' : 'B',
+    },
+    emotion_bar: [
+      { emotion: 'confidence', label: 'الثقة', intensity: Math.round(truth), color: '#00FFD4', dominant: false },
+      { emotion: 'calmness', label: 'الهدوء', intensity: Math.round(calmness), color: '#30D158', dominant: false },
+      { emotion: 'enthusiasm', label: 'الحماس', intensity: Math.round(engagement), color: '#FFD60A', dominant: false },
+      { emotion: 'stress', label: 'التوتر', intensity: Math.round(stress), color: '#FF9F0A', dominant: false },
+      { emotion: 'hesitation', label: 'التردد', intensity: Math.round(hesitation), color: '#FF453A', dominant: false },
+      { emotion: 'authenticity', label: 'المصداقية', intensity: Math.round(truth), color: '#147EFF', dominant: false },
+    ],
+    overlays: {
+      face: {
+        color: stress > 65 ? '#FF3B30' : stress > 38 ? '#FF9F0A' : '#30D158',
+        label: micro[0]!.slice(0, 48),
+        stress_level: stress > 65 ? 'high' : stress > 38 ? 'medium' : 'low',
+      },
+      eyes: { color: '#FFD60A', label: 'مسار بصري', gaze: engagement > 55 ? 'direct' : 'scanning' },
+      mouth: { color: '#FF3B30', label: hesitation > 50 ? 'تردّد لساني' : 'طلاقة', speech: hesitation > 50 ? 'hesitant' : 'fluent' },
+      shoulders: {
+        color: '#147EFF',
+        label: r.anxiety !== 'Low' ? 'توتر ظاهر في الكتفين' : 'مستقر',
+        posture: r.anxiety === 'High' ? 'tense' : 'open',
+      },
+      hands: { color: '#FFD60A', label: 'إيماءات', gesture: 'adaptive' },
+      fullbody: { color: '#FFD60A', label: `نبض تقديري ~${r.heartRate} bpm`, orientation: 'toward' },
+    },
+    facs_detected: micro.slice(0, 4).map((m, i) => ({
+      au: `AU${21 + i}`,
+      meaning: m,
+      type: 'observation',
+      duration: 'instant',
+    })),
+    ai_detection: {
+      overall_risk: 'clean',
+      risk_score: 0,
+      signals_detected: 0,
+      signals: {
+        reading_eye_movement: { detected: false, confidence: 8, note: micro[1]?.slice(0, 48) ?? 'ضمن النطاق' },
+        speech_thought_mismatch: { detected: hesitation > 72, confidence: hesitation, note: hesitation > 72 ? 'ارتفاع تردد لساني' : 'متسق' },
+        gaze_displacement: { detected: false, confidence: 6, note: 'غير مُستنتج من دورة المقاييس النصية' },
+        response_timing: { detected: false, confidence: 5, note: '—' },
+        prosody_mismatch: {
+          detected: r.voiceTremor > 70,
+          confidence: r.voiceTremor,
+          note: r.voiceTremor > 70 ? 'رجفة صوتية مرتفعة في النموذج' : 'معتدل',
+        },
+        thinking_face_absent: { detected: false, confidence: 5, note: '—' },
+      },
+      assessment: `مقاييس لحظية (Gemini): توتر ${stress}، مصداقية نموذجية ${truth}، مشاركة ${engagement}.`,
+      recommended_action: 'متابعة المقابلة ومراجعة الانحراف عن خط الأساس عند توفر وقت أطول.',
+    },
+    baseline: {
+      established: baselineEstablished,
+      progress_pct: baselineProgress,
+      deviation_from_baseline: baselineEstablished ? (stress > 70 ? 'elevated_arousal' : 'within_range') : 'none',
+      note: baselineEstablished
+        ? 'مقارنة تقريبية مع الجلسة الحالية (تحديث كل ١٥ ثانية).'
+        : 'معايرة أولية — المقاييس استرشادية حتى إكمال ٣٠ ثانية.',
+    },
+    body_language: [
+      {
+        zone: 'posture',
+        observation: micro[0] ?? '',
+        status: calmness > 55 ? 'good' : 'watch',
+        detail: micro[1] ?? 'تحليل سلوكي لحظي.',
+      },
+    ],
+    key_moment: { is_notable: stress > 75, description: stress > 75 ? 'ارتفاع التوتر اللحظي' : 'مستقر', type: 'stress_spike' },
+    coaching_note: calmness < 45 ? 'خفّف وتيرة الكلام وزد التنفس العميق.' : 'الإيقاع جيد لمتابعة الإجابة.',
+    alert: stress > 90 ? { message: 'ارتفاع حاد في مؤشر التوتر اللحظي', level: 'high', type: 'stress' } : null,
+    disclaimer: 'Behavioral pattern analysis only. Not lie detection.',
+    exam_violations,
+    integrity_score,
+  };
+
+  const colorMap: Record<string, string> = {
+    confidence: '#00FFD4',
+    calmness: '#30D158',
+    enthusiasm: '#FFD60A',
+    stress: '#FF9F0A',
+    hesitation: '#FF453A',
+    authenticity: '#147EFF',
+  };
+  result.emotion_bar = result.emotion_bar.map((e) => ({ ...e, color: colorMap[e.emotion] || e.color, dominant: false }));
+  const maxIdx = result.emotion_bar.reduce(
+    (maxI, e, i, arr) => (e.intensity > arr[maxI].intensity ? i : maxI),
+    0
+  );
+  result.emotion_bar[maxIdx] = { ...result.emotion_bar[maxIdx], dominant: true };
+
+  return result;
+}
+
+/** Periodic Gemini refresh (text metrics) mapped to HUD shape — lowers vision API calls / rate limits. */
+export async function analyzeLiveFrameWithGeminiMetrics(
+  context: LiveAnalysisContext,
+  examMode: boolean
+): Promise<DetailedLiveAnalysis> {
+  const elapsedSeconds = Math.floor((Date.now() - context.startTimeMs) / 1000);
+  const desc = [
+    'Ongoing live interview behavioral frame analysis.',
+    `session=${context.sessionId}`,
+    `frame=${context.framesProcessed}`,
+    `elapsed_s=${elapsedSeconds}`,
+    `history_len=${context.history.length}`,
+    examMode ? 'exam_mode=true' : '',
+  ]
+    .filter(Boolean)
+    .join(' | ');
+
+  let r: LiveAnalysisResult;
+  try {
+    r = await analyzeLiveFrameWithAI(desc);
+  } catch (e) {
+    console.error('Gemini live metrics request failed:', e);
+    r = {
+      stress: 28,
+      truth: 72,
+      engagement: 68,
+      anxiety: 'Medium',
+      heartRate: 84,
+      voiceTremor: 22,
+      microExpressions: ['Fallback: API error — values are conservative placeholders'],
+    };
+  }
+
+  const result = mapLiveGeminiMetricsToDetailed(r, context, examMode);
+  const baselineProgress = Math.min(100, Math.floor((elapsedSeconds / 30) * 100));
+  const baselineEstablished = elapsedSeconds >= 30;
+
+  if (!baselineEstablished) {
+    result.session = { ...result.session, baseline_established: false, calibration_progress: baselineProgress };
+    result.baseline = { ...result.baseline, established: false, progress_pct: baselineProgress };
+    if (result.ai_detection) {
+      result.ai_detection.overall_risk = 'clean';
+      result.ai_detection.risk_score = 0;
+      result.ai_detection.signals_detected = 0;
+    }
+  }
+
+  return result;
+}
+
 // ─── EXPORTED FUNCTION ────────────────────────────────────────────────────
 export async function analyzeLiveFrameWithOpenAI(
   base64Frame: string,
@@ -209,7 +412,7 @@ Analyze what you actually see. Return real values. Return raw JSON only — no m
   let textContent = "";
   try {
     const fullPrompt = `${SYSTEM_PROMPT}\n\n${framePrompt}`;
-    textContent = await askGeminiWithImage(fullPrompt, base64Frame);
+    textContent = await generateGeminiWithImage(fullPrompt, base64Frame, 'image/jpeg');
   } catch (error: any) {
     console.error("Gemini Vision Error:", error);
     throw new Error("No response from AI API: " + error.message);

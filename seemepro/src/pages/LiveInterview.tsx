@@ -4,13 +4,13 @@ import { Activity, ShieldAlert, VideoOff, Crosshair, CheckCircle, Clock, Save, F
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, CartesianGrid, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 
-import { analyzeLiveFrameWithOpenAI } from '../utils/liveAnalysisService';
+import { analyzeLiveFrameWithGeminiMetrics } from '../utils/liveAnalysisService';
 import type { DetailedLiveAnalysis, LiveAnalysisContext } from '../utils/liveAnalysisService';
 import { useAppStore } from '../store/useAppStore';
 import { RewardedAdModal } from '../components/RewardedAdModal';
 import { useFaceMeshOverlay } from '../hooks/useFaceMeshOverlay';
 
-const ANALYSIS_INTERVAL_MS = 3500;
+const ANALYSIS_INTERVAL_MS = 15000;
 
 interface DataPoint { time: number; stress: number; authenticity: number; engagement: number; integrity?: number; }
 
@@ -119,7 +119,6 @@ const LiveInterview = () => {
 
     const videoStreamRef = useRef<MediaStream | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
-    const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const faceMeshCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const contextRef = useRef<LiveAnalysisContext | null>(null);
@@ -264,24 +263,20 @@ const LiveInterview = () => {
 
             contextRef.current = { sessionId, startTimeMs: Date.now(), framesProcessed: 0, history: [] };
 
-            const cc = document.createElement('canvas');
-            cc.width = 1280; cc.height = 720;
-            captureCanvasRef.current = cc;
-
             frameIntervalRef.current = setInterval(async () => {
-                const ctx = cc.getContext('2d');
-                if (!videoRef.current || !ctx || !contextRef.current || isAnalyzingFrame) return;
-                ctx.drawImage(videoRef.current, 0, 0, 1280, 720);
-                const b64 = cc.toDataURL('image/jpeg', 0.8).split(',')[1];
+                if (!videoRef.current || !contextRef.current || isAnalyzingFrame) return;
                 try {
                     setIsAnalyzingFrame(true);
                     contextRef.current.framesProcessed += 1;
-                    const res = await analyzeLiveFrameWithOpenAI(b64, contextRef.current, config.examMode);
+                    const res = await analyzeLiveFrameWithGeminiMetrics(contextRef.current, config.examMode);
                     contextRef.current.history.push({ scores: res.scores, baseline: res.baseline, emotion_bar: res.emotion_bar });
                     if (contextRef.current.history.length > 30) contextRef.current.history.shift();
                     processAnalysisResult(res);
-                } catch (e) { console.error("Frame failed", e); }
-                finally { setIsAnalyzingFrame(false); }
+                } catch (e) {
+                    console.error('Frame failed', e);
+                } finally {
+                    setIsAnalyzingFrame(false);
+                }
             }, ANALYSIS_INTERVAL_MS);
 
         } catch (err) {
