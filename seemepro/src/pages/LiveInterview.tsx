@@ -263,8 +263,10 @@ const LiveInterview = () => {
 
             contextRef.current = { sessionId, startTimeMs: Date.now(), framesProcessed: 0, history: [] };
 
-            frameIntervalRef.current = setInterval(async () => {
-                if (!videoRef.current || !contextRef.current || isAnalyzingFrame) return;
+            let tickInFlight = false;
+            const runGeminiLiveTick = async () => {
+                if (!videoRef.current || !contextRef.current || tickInFlight) return;
+                tickInFlight = true;
                 try {
                     setIsAnalyzingFrame(true);
                     contextRef.current.framesProcessed += 1;
@@ -276,13 +278,19 @@ const LiveInterview = () => {
                     console.error('Frame failed', e);
                 } finally {
                     setIsAnalyzingFrame(false);
+                    tickInFlight = false;
                 }
+            };
+
+            void runGeminiLiveTick();
+            frameIntervalRef.current = setInterval(() => {
+                void runGeminiLiveTick();
             }, ANALYSIS_INTERVAL_MS);
 
         } catch (err) {
             console.warn('Camera access denied:', err);
         }
-    }, [sessionId, isAnalyzingFrame, processAnalysisResult, config.examMode, facingMode]);
+    }, [sessionId, processAnalysisResult, config.examMode, facingMode]);
 
     const handleStartLive = async () => {
         const hasCredit = consumeCredit('live');
